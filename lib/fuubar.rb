@@ -6,6 +6,7 @@ require 'ruby-progressbar'
 require 'fuubar/output'
 
 RSpec.configuration.add_setting :fuubar_progress_bar_options, :default => {}
+RSpec.configuration.add_setting :fuubar_example_display_length, :default => 80
 
 class Fuubar < RSpec::Core::Formatters::BaseTextFormatter
   DEFAULT_PROGRESS_BAR_OPTIONS = { :format => ' %c/%C |%w>%i| %e ' }.freeze
@@ -13,6 +14,7 @@ class Fuubar < RSpec::Core::Formatters::BaseTextFormatter
   RSpec::Core::Formatters.register self,
                                    :close,
                                    :dump_failures,
+                                   :example_started,
                                    :example_failed,
                                    :example_passed,
                                    :example_pending,
@@ -35,7 +37,8 @@ class Fuubar < RSpec::Core::Formatters::BaseTextFormatter
                         .merge(:throttle_rate => continuous_integration? ? 1.0 : nil)
                         .merge(:total     => 0,
                                :output    => output,
-                               :autostart => false)
+                               :autostart => false,
+                               :title     => ' ' * configuration.fuubar_example_display_length)
     )
   end
 
@@ -45,7 +48,8 @@ class Fuubar < RSpec::Core::Formatters::BaseTextFormatter
                              .merge(configuration.fuubar_progress_bar_options)
                              .merge(:total     => notification.count,
                                     :output    => output,
-                                    :autostart => false)
+                                    :autostart => false,
+                                    :title     => ' ' * configuration.fuubar_example_display_length)
 
     self.progress            = ProgressBar.create(progress_bar_options)
     self.passed_count        = 0
@@ -69,6 +73,14 @@ class Fuubar < RSpec::Core::Formatters::BaseTextFormatter
 
   def close(_notification)
     example_tick_thread.kill
+  end
+
+  def example_started(notification)
+    width = configuration.fuubar_example_display_length
+    title = notification.example.location
+    title = '…' + title.slice(-(width - 1)..-1) if title.size > width
+    with_current_color { progress.title = title.ljust(width) }
+    refresh
   end
 
   def example_passed(_notification)
